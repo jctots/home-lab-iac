@@ -1,0 +1,34 @@
+name: update-docs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '_snapshots/**'
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip3 install --quiet --break-system-packages requests
+
+      - name: Run doc update agent
+        env:
+          OLLAMA_URL: http://192.168.xx.xx:11434
+          LLM_MODEL: qwen2.5:latest
+          GITEA_URL: https://git.home.lab
+          GITEA_TOKEN: ${{ gitea.token }}
+          GITEA_REPO: homelab-user/home-lab-iac
+        run: python3 _scripts/update-docs-agent.py
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -s -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            https://ntfy.home.lab/gitea-ci

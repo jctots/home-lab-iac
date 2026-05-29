@@ -1,0 +1,14 @@
+# pdf-translate — self-hosted PDF translation (homelab-user/pdf-translate)
+
+services:
+  pdf-translate:
+    image: ghcr.io/home-lab/pdf-translate:latest
+    container_name: pdf-translate
+    ports:
+      - "7860:7860"
+    volumes:
+      - /home/homelab-admin/pdf-translate:/app/data
+    environment:
+      - LIBRETRANSLATE_BLOCK_DELAY_MS=0
+      - PDF_TRANSLATE_DEBUG=0
+    restart: unless-stopped

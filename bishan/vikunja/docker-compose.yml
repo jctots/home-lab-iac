@@ -1,0 +1,17 @@
+# based from https://vikunja.io/docs/full-docker-example/
+
+services:
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: vikunja
+    restart: unless-stopped
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: https://tasks.home.lab
+      VIKUNJA_DATABASE_TYPE: sqlite
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+      VIKUNJA_SERVICE_SECRET: ${VIKUNJA_SERVICE_SECRET}
+    volumes:
+      - /home/homelab-admin/vikunja/files:/app/vikunja/files
+      - /home/homelab-admin/vikunja/db:/db
+    ports:
+      - 3456:3456

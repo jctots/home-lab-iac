@@ -1,0 +1,37 @@
+# based on https://www.home-assistant.io/installation/linux#docker-compose
+
+services:
+  home-assistant:
+    container_name: home-assistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - /home/homelab-admin/home-assistant/home-assistant-data:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      TZ: Europe/Berlin
+
+  # based on https://github.com/matter-js/python-matter-server/blob/main/docs/docker.md#running-using-docker-compose
+
+  # python-matter-server
+  matter-server:
+    image: ghcr.io/matter-js/python-matter-server:stable
+    container_name: home-assistant-matter-server
+    restart: unless-stopped
+    # Required for mDNS to work correctly
+    network_mode: host
+    security_opt:
+      # Needed for Bluetooth via dbus
+      - apparmor:unconfined
+    volumes:
+      # Create an .env file that sets the USERDIR environment variable.
+      - /home/homelab-admin/home-assistant/matter-server-data:/data/
+      # Required for Bluetooth via D-Bus
+      - /run/dbus:/run/dbus:ro
+    # If you adjust command line, make sure to pass the default CMD arguments too:
+    #command: --storage-path /data --paa-root-cert-dir /data/credentials --bluetooth-adapter 0
+
+

@@ -1,0 +1,17 @@
+#based from https://github.com/idealneil/filebrowser-docker-guide
+
+services:
+  filebrowser:
+    image: filebrowser/filebrowser
+    container_name: filebrowser
+    restart: unless-stopped
+    environment:
+      - PUID=1000 #"id $user" to find your uid & gid values
+      - PGID=1000
+    volumes:
+      - /mnt/share:/srv #change 'user' to the name of your account
+      - /home/homelab-admin/filebrowser:/database #this will create the filebrowser.db file
+      - /home/homelab-admin/filebrowser:/config #this will create the settings.json file
+    ports:
+      - 8080:80 #default port is 8080, change as needed. Don't change the right hand side port (port 80)
+    

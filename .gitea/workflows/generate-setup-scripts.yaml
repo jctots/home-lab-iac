@@ -1,0 +1,65 @@
+name: generate-setup-scripts
+
+on:
+  workflow_dispatch:
+
+# Generates changi/host-setup.sh and changi/{vmid}-{name}.sh + .conf files
+# by running the generate-* scripts on changi and committing the results.
+#
+# Prerequisite: homelab-admin user exists on changi, is in the www-data group,
+# and the CI SSH key is in /home/homelab-admin/.ssh/authorized_keys on changi.
+# Run after any Proxmox host config or VM hardware change.
+
+jobs:
+  generate-setup-scripts:
+    runs-on: ubuntu-latest
+    env:
+      IP_CHANGI: 192.168.xx.xx
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "$IP_CHANGI changi" | sudo tee -a /etc/hosts
+
+      - name: Debug SSH key
+        run: |
+          echo "Public key the runner is using:"
+          ssh-keygen -y -f ~/.ssh/id_ed25519
+
+      - name: Run scripts on changi
+        run: |
+          scp _scripts/generate-host-setup.sh _scripts/generate-vm-setup.sh homelab-admin@changi:/tmp/
+          ssh homelab-admin@changi "REPO_DIR=/tmp bash /tmp/generate-host-setup.sh && REPO_DIR=/tmp bash /tmp/generate-vm-setup.sh"
+
+      - name: Retrieve generated files
+        run: |
+          mkdir -p changi/_setup _snapshots
+          scp "homelab-admin@changi:/tmp/changi/_setup/*.sh" changi/_setup/
+          scp "homelab-admin@changi:/tmp/_snapshots/vm-*.yaml" _snapshots/
+          ssh homelab-admin@changi "rm -rf /tmp/generate-host-setup.sh /tmp/generate-vm-setup.sh /tmp/changi /tmp/_snapshots"
+
+      - name: Commit and push
+        run: |
+          git config user.name "gitea-actions"
+          git config user.email "actions@home.lab"
+          git remote set-url origin "https://gitea-actions:${{ gitea.token }}@git.home.lab/homelab-user/home-lab-iac.git"
+          git add changi/_setup/ _snapshots/
+          git diff --staged --quiet && echo "No changes to commit." && exit 0
+          git commit -m "config: regenerate changi setup scripts $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -s -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            https://ntfy.home.lab/gitea-ci
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

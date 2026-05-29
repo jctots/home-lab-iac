@@ -1,0 +1,15 @@
+# https://github.com/binwiederhier/ntfy/blob/main/docker-compose.yml
+
+services:
+  ntfy:
+    image: binwiederhier/ntfy
+    container_name: ntfy
+    command: serve
+    environment:
+      - TZ=Europe/Berlin
+    volumes:
+      - /home/homelab-admin/ntfy/cache:/var/cache/ntfy
+      - /home/homelab-admin/ntfy/etc:/etc/ntfy
+    ports:
+      - 8081:80
+    restart: unless-stopped

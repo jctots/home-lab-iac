@@ -1,0 +1,16 @@
+1. enable tailscale funnel in tailscale admin
+
+1. enable tailscale funnel in clementi to point to nginx-proxy-manager
+
+    ``` bash
+    sudo tailscale funnel --bg 80
+    ```
+
+1. generate tailscale certificate in clementi
+
+    ``` bash
+    sudo tailscale cert <tailscale_magicdns_hostname>
+    ```
+1. add generated certificate to nginx-proxy-manager
+
+1. modify n8n docker compose with <tailscale_magicdns_hostname>

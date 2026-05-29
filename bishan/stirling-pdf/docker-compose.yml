@@ -1,0 +1,17 @@
+# based on https://docs.stirlingpdf.com/Installation/Docker%20Install
+
+services:
+  stirling-pdf:
+    image: stirlingtools/stirling-pdf:latest
+    container_name: stirling-pdf
+    ports:
+      - 8080:8080
+    volumes:
+      - /home/homelab-admin/stirling-pdf/tessdata:/usr/share/tessdata  # OCR language files
+      - /home/homelab-admin/stirling-pdf/configs:/configs               # Settings & database
+      - /home/homelab-admin/stirling-pdf/logs:/logs                     # Application logs
+      - /home/homelab-admin/stirling-pdf/pipeline:/pipeline             # Automation configs
+    environment:
+      - SECURITY_ENABLELOGIN=false    # Set true to enable user authentication
+      - LANGS=en_GB                   # Interface language
+    restart: unless-stopped

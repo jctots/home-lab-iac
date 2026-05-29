@@ -1,0 +1,25 @@
+# based on https://docs.mealie.io/documentation/getting-started/installation/sqlite/
+
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest # 
+    container_name: mealie
+    restart: always
+    ports:
+        - "9925:9000" # 
+    deploy:
+      resources:
+        limits:
+          memory: 1000M # 
+    volumes:
+      - /home/homelab-admin/mealie:/app/data/
+    environment:
+      # Set Backend ENV Variables Here
+      ALLOW_SIGNUP: "false"
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+      BASE_URL: https://recipes.home.lab
+
+# volumes:
+#   mealie-data: 

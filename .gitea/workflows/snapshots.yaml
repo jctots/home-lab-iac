@@ -1,0 +1,102 @@
+name: snapshots
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # weekly, Monday 06:00 UTC
+
+jobs:
+  snapshots:
+    runs-on: ubuntu-latest
+    env:
+      IP_BISHAN: 192.168.xx.xx
+      IP_BEDOK: 192.168.xx.xx
+      IP_BRADDELL: 192.168.xx.xx
+      IP_CLEMENTI: 192.168.xx.xx
+      IP_CHANGI: 192.168.xx.xx
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Accept host keys automatically — home lab, private IPs only
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+          # LAN hostnames — runner container has no DNS for these
+          printf "%s bishan\n%s bedok\n%s braddell\n%s clementi\n%s changi\n" \
+            "$IP_BISHAN" "$IP_BEDOK" "$IP_BRADDELL" "$IP_CLEMENTI" "$IP_CHANGI" \
+            | sudo tee -a /etc/hosts
+
+      # ── Gate ────────────────────────────────────────────────────────────────
+      - name: Check backup status
+        env:
+          PBS_TOKEN_ID: ${{ secrets.PBS_TOKEN_ID }}
+          PBS_TOKEN_SECRET: ${{ secrets.PBS_TOKEN_SECRET }}
+        run: bash _scripts/check-backup-status.sh
+
+      # ── Snapshots ───────────────────────────────────────────────────────────
+      - name: Generate network snapshot
+        env:
+          FLORENCE_HOST: 192.168.xx.xx
+          FLORENCE_USER: homelab-user
+          FLORENCE_PORT: "2022"
+        run: bash _scripts/generate-network-snapshot.sh
+
+      - name: Generate NPM snapshot
+        env:
+          NPM_EMAIL: ${{ secrets.NPM_EMAIL }}
+          NPM_PASSWORD: ${{ secrets.NPM_PASSWORD }}
+        run: bash _scripts/generate-npm-snapshot.sh
+
+      - name: Generate image hashes
+        run: |
+          mkdir -p _snapshots
+          rm -f _snapshots/image-hash-*.yaml
+          # bedok runs locally (this runner is on bedok)
+          bash _scripts/generate-image-snapshot.sh > _snapshots/image-hash-bedok.yaml
+          # remaining VMs via SSH
+          for host in bishan braddell clementi; do
+            echo "Snapshotting ${host}..."
+            ssh homelab-admin@${host} bash < _scripts/generate-image-snapshot.sh \
+              > _snapshots/image-hash-${host}.yaml || echo "Warning: failed for ${host}, skipping"
+          done
+
+      - name: Generate PVE config snapshot
+        env:
+          PROXMOX_TOKEN_ID: ${{ secrets.PROXMOX_TOKEN_ID }}
+          PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+        run: bash _scripts/generate-pve-config-snapshot.sh
+
+      - name: Generate PBS config snapshot
+        env:
+          PBS_TOKEN_ID: ${{ secrets.PBS_TOKEN_ID }}
+          PBS_TOKEN_SECRET: ${{ secrets.PBS_TOKEN_SECRET }}
+        run: bash _scripts/generate-pbs-config-snapshot.sh
+
+      - name: Generate kopia config snapshots
+        run: bash _scripts/generate-kopia-config-snapshot.sh
+
+      # ── Commit ──────────────────────────────────────────────────────────────
+      - name: Commit snapshots
+        run: |
+          git config user.name "gitea-actions"
+          git config user.email "actions@home.lab"
+          git remote set-url origin "https://gitea-actions:${{ gitea.token }}@git.home.lab/homelab-user/home-lab-iac.git"
+          git add _snapshots/
+          git diff --staged --quiet && echo "No changes to commit." && exit 0
+          git commit -m "snapshot: automated update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
+
+      # ── Cleanup ─────────────────────────────────────────────────────────────
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -s -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            https://ntfy.home.lab/gitea-ci
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

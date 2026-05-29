@@ -1,0 +1,21 @@
+#based from https://github.com/dani-garcia/vaultwarden
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      DOMAIN: 'https://vault.home.lab'
+      SMTP_HOST: smtp.migadu.com
+      SMTP_FROM: vault@home.lab
+      SMTP_PORT: 465 
+      SMTP_SECURITY: force_tls 
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    volumes:
+      - /home/homelab-admin/vaultwarden:/data
+    ports:
+      - 9080:80
+
+      
